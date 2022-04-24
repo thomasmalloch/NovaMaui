@@ -1,20 +1,46 @@
-﻿namespace NovaMaui;
+﻿using SkiaSharp;
+using SkiaSharp.Views.Maui;
+using SkiaSharp.Views.Maui.Controls;
+using Microsoft.Maui.Graphics;
+using System.Diagnostics;
+
+namespace NovaMaui;
 
 public partial class MainPage : ContentPage
 {
-	int count = 0;
+	private Stopwatch Clock = new Stopwatch();
 
 	public MainPage()
 	{
-		InitializeComponent();
+		this.InitializeComponent();
+		SKCanvasView view = new SKCanvasView();
+		view.PaintSurface += this.OnCanvasViewPaintSurface;
+		this.Content = view;
 	}
 
-	private void OnCounterClicked(object sender, EventArgs e)
+	private void OnCanvasViewPaintSurface(object sender, SKPaintSurfaceEventArgs args)
 	{
-		count++;
-		CounterLabel.Text = $"Current count: {count}";
+		SKImageInfo info = args.Info;
+		SKSurface surface = args.Surface;
+		SKCanvas canvas = surface.Canvas;
 
-		SemanticScreenReader.Announce(CounterLabel.Text);
+		canvas.Clear();
+
+		SKPaint paint = new SKPaint
+		{
+			Style = SKPaintStyle.Stroke,
+			Color = Colors.Red.ToSKColor(),
+			StrokeWidth = 25
+		};
+
+		canvas.DrawCircle(info.Width / 2, info.Height / 2, 100, paint);
+		paint.Style = SKPaintStyle.Fill;
+		paint.Color = SKColors.Blue;
+		canvas.DrawCircle(args.Info.Width / 2, args.Info.Height / 2, 100, paint);		
 	}
+
+	public void Clear() 
+	{
+	}	
 }
 
