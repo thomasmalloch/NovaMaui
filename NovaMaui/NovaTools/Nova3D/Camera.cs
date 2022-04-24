@@ -12,34 +12,35 @@ namespace NovaTools.Nova3D;
 
 public class Camera
 {
-	private float x_scale_;
-	private float y_scale_;
-	private float screen_width_;
-	private float screen_height_;
-	private float fov_;
-	private float fov_half_;
-	private float near_;
-	private float far_;
-	private Vector3 position_;
-	private float angle_;
-	private float cos_angle_;
-	private float sin_angle_;
+	public float x_scale_{ get; set; }
+	public float y_scale_{ get; set; }
+	public float screen_width_{ get; set; }
+	public float screen_height_{ get; set; }
+	public float fov_{ get; set; }
+	public float fov_half_{ get; set; }
+	public float near_{ get; set; }
+	public float far_{ get; set; }
+	public Vector3 position_{ get; set; }
+	public float angle_{ get; set; }
+	public float cos_angle_{ get; set; }
+	public float sin_angle_{ get; set; }
+	public Node CurrentNode { get; set; }
+	public List<Plane> clipping_planes_{ get; set; }
+	public Vector2 Scale => new(x_scale_, y_scale_);
 
-	private Node current_node_;
-	private List<Plane> clipping_planes_;
-
+	[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 	private void UpdateClippingPlanes()
 	{
-		var x1 = 10f * MathF.Cos(fov_half_ + (MathF.PI / 2f));
-		var z1 = 10f * MathF.Sin(fov_half_ + (MathF.PI / 2f));
-		var x2 = MathF.Cos(fov_half_ + (MathF.PI / 2f));
-		var z2 = MathF.Sin(fov_half_ + (MathF.PI / 2f));
-		var left = NovaMathF.CreatePlane(new Vector3(x1, 0, z1), new Vector3(-(z2 - z1), 0, x2 - x1));
+		float x1, x2, z1, z2;
+		(z2, x2) = MathF.SinCos(fov_half_ + (MathF.PI / 2f));
+		x1 = x2 * 8f;
+		z1 = z2 * 8f;
 
-		x1 = MathF.Cos(-fov_half_ + (MathF.PI / 2f));
-		z1 = MathF.Sin(-fov_half_ + (MathF.PI / 2f));
-		x2 = 10f * MathF.Cos(-fov_half_ + (MathF.PI / 2f));
-		z2 = 10f * MathF.Sin(-fov_half_ + (MathF.PI / 2f));
+		var left = NovaMathF.CreatePlane(new Vector3(x1, 0, z1), new Vector3(-(z2 - z1), 0, x2 - x1));
+		(z1, x1) = MathF.SinCos(-fov_half_ + (MathF.PI / 2f));
+		z2 = (z1 * 8f);
+		x2 = (x1 * 8f);
+
 		var right = NovaMathF.CreatePlane(new Vector3(x2, 0, z2), new Vector3(-(z2 - z1), 0, x2 - x1));
 		var plane_near = NovaMathF.CreatePlane(new Vector3(0, 0, near_), new Vector3(0, 0, 1));
 		var plane_far = NovaMathF.CreatePlane(new Vector3(0, 0, 250), new Vector3(0, 0, -1));

@@ -40,9 +40,19 @@ public static class NovaMathF
 		return x1 * x2 + y1 * y2 + z1 * z2;
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static float DotProduct(Vector3 a, Vector3 b)
 	{
 		return a.X * b.X + a.Y * b.Y + a.Z * b.Z;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
+	public static Vector3 Intersect(Plane plane, Vector3 p1, Vector3 p2) 
+	{
+		var ad = Vector3.Dot(p1, plane.Normal);
+		var bd = Vector3.Dot(p2, plane.Normal);
+		var t = (-plane.D - ad) / (bd - ad);
+		return (p2 - p1) * t + p1;
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]

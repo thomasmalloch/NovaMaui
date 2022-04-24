@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using SkiaSharp;
@@ -18,6 +19,6 @@ public class Wall
     public SKBitmap Texture { get; set; }
     public float TextureHeight { get; set; }
     public int NodeIndex { get; set; }
-
+    
     public bool IsPortal => (this.NodeIndex >= 0);
 }

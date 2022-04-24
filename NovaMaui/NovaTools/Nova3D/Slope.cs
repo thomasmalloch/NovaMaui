@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NovaMaui.NovaTools.Nova3D;
+namespace NovaTools.Nova3D;
 
 
 public struct Slope

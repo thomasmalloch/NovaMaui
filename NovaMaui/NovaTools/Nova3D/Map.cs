@@ -10,9 +10,9 @@ namespace NovaTools.Nova3D;
 
 public class Map
 {
-    List<Vector3> SpawnPoints;
-    List<Quaternion> SpawnRotations;
-    int PlayerNodeIndex;
-    List<Node> Nodes;
-    float AmbientLight;
+    public List<Vector3> SpawnPoints { get; set; }
+    public List<Quaternion> SpawnRotations { get; set; }
+    public int PlayerNodeIndex { get; set; }
+    public List<Node> Nodes { get; set; }
+    public float AmbientLight { get; set; }
 }
