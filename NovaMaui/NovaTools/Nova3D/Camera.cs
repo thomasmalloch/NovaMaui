@@ -25,7 +25,7 @@ public class Camera
 	public float cos_angle_{ get; set; }
 	public float sin_angle_{ get; set; }
 	public Node CurrentNode { get; set; }
-	public List<Plane> clipping_planes_{ get; set; }
+	public List<Plane> clipping_planes_ { get; set; } = new();
 	public Vector2 Scale => new(x_scale_, y_scale_);
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
@@ -109,5 +109,11 @@ public class Camera
 	public void SetFieldOfView(int degrees)
 	{
 		SetFieldOfView(degrees * MathF.PI / 180f);
+	}
+
+	public void SetAngle(float angle) 
+	{
+		angle_ = angle;
+		(sin_angle_, cos_angle_) = MathF.SinCos(angle);
 	}
 }

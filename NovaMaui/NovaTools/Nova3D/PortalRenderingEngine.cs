@@ -15,7 +15,6 @@ public abstract class PortalRenderingEngine : IDisposable
 	Map current_map_;
 	Camera camera_;
 
-
 	int window_width_;
 	int window_height_;
 	int pixel_scale_;
@@ -23,7 +22,8 @@ public abstract class PortalRenderingEngine : IDisposable
 	int height_;
 	bool is_fullscreen_;
 	float[] depth_buffer_;
-
+	uint[] pixel_buffer_;
+	
 	SKColor fog_colour_;
 	float fog_occlusion_distance_;
 	float fog_density_;
@@ -55,14 +55,19 @@ public abstract class PortalRenderingEngine : IDisposable
 		width_ = window_width_ / pixel_scale_;
 		height_ = window_height_ / pixel_scale_;
 		depth_buffer_ = new float[width * height];
+		pixel_buffer_ = new uint[width * height];
 
 		for (int i = 0; i < width_ * height_; i++)
 			depth_buffer_[i] = float.MaxValue;
+
+		for (int i = 0; i < width_ * height_; i++)
+			pixel_buffer_[i] = 0;
 
 		camera_ = new Camera(width_, height_);
 		fog_colour_ = new SKColor(0x11, 0x11, 0x22);
 		fog_occlusion_distance_ = 150;
 		fog_density_ = MathF.Log(255) / MathF.Log(fog_occlusion_distance_);
+		this.LoadWorker();
 	}
 
 	public void Run()
@@ -71,7 +76,6 @@ public abstract class PortalRenderingEngine : IDisposable
 
 
 	}
-
 
 	public void UpdateActorPositions()
 	{
@@ -89,8 +93,62 @@ public abstract class PortalRenderingEngine : IDisposable
 		}
 	}
 
-	private void Clear()
+	[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
+	private void Clear(SKBitmap pixel_buffer)
 	{
+		for (int i = 0; i < width_ * height_; i++)
+			depth_buffer_[i] = float.MaxValue;
+
+		IntPtr pixels = pixel_buffer.GetPixels();
+		uint fog = MakePixel(fog_colour_);
+		unsafe 
+		{			
+			uint* ptr = (uint*)pixels.ToPointer();
+			for (int x = 0; x < width_; x++)
+			{
+				for (int y = 0; y < height_; y++)
+				{
+					*ptr++ = fog;
+					pixel_buffer_[x + y * width_] = fog;
+				}
+			}			
+		}
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static uint MakePixel(byte red, byte green, byte blue, byte alpha)
+	{
+		return (uint)((alpha << 24) | (blue << 16) | (green << 8) | red);
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static uint MakePixel(SKColor c)
+	{
+		return (uint)((c.Alpha << 24) | (c.Blue << 16) | (c.Green << 8) | c.Red);
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static (byte a, byte b, byte g, byte r) BreakPixel(uint p) 
+	{
+		unchecked
+		{
+			return ((byte)(p & (0xFF << 24)),
+					(byte)(p & (0xFF << 16)),
+					(byte)(p & (0xFF << 8)),
+					(byte)(p & (0xFF << 0)));
+		}
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static (byte a, byte b, byte g, byte r) BreakPixel(SKColor c)
+	{
+		return (c.Alpha, c.Blue, c.Green, c.Red);
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static bool IsPixelVisible(uint c) 
+	{
+		return ((c & (0xFF << 24)) != 0);
 	}
 
 	public void RenderMinimap()
@@ -99,36 +157,88 @@ public abstract class PortalRenderingEngine : IDisposable
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 	public void DrawPixel(
-		SKBitmap pixels, int x, int y,
+		uint[] pixels, int x, int y,
 		float u, float v, SKBitmap texture,
 		float z, float map_x, float map_y, float map_z)
 	{
 		if (depth_buffer_[x + y * width_] < z)
 			return;
 
-		SKSizeI size = pixels.Info.Size;
-		int uu = Math.Clamp(0, size.Width, ((int)(u * size.Width)) % size.Width);
-		int vv = Math.Clamp(0, size.Height, ((int)(v * size.Width)) % size.Width);
-
-		var colour = texture.GetPixel(uu, vv);
-		if (colour.Alpha == 0)
+		if (texture == null)
+		{
+			pixels[x + y * width_] = (uint)SKColors.White;
+			depth_buffer_[x + y * width_] = z;
 			return;
+		}
+
+		SKSizeI size = texture.Info.Size;
+		int uu = Math.Clamp(((int)(u * size.Width)) % size.Width, 0, size.Width);
+		int vv = Math.Clamp(((int)(v * size.Width)) % size.Width, 0, size.Height);
+
+		IntPtr t = texture.GetPixels();
+		unsafe
+		{
+			uint p = ((uint*)t)[uu + vv * texture.Info.Width];
+			if (!IsPixelVisible(p))
+				return;
+
+			var dx = camera_.position_.X - map_x;
+			var dy = camera_.position_.Y - map_y;
+			var dz = camera_.position_.Z - map_z;
+
+			/*(byte a, byte b, byte g, byte r) = BreakPixel(p);
+			r = Mix(r, colour.r, 255);
+			g = Mix(g, colour.g, 255);
+			b = Mix(b, colour.b, 255);*/
+
+
+			pixels[x + y * width_] = p;
+		}
 
 		depth_buffer_[x + y * width_] = z;
-		pixels.SetPixel(x, y, colour);
 	}
 
-	public void DrawLine()
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static float Mix(float f, int a, int b) 
 	{
+		return a + (b - a) * f;
 	}
 
-	public void DrawFrame(float delta, object input)
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static float Mix(float f, byte a, byte b)
+	{
+		return a + (b - a) * f;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
+	public void DrawFrame(SKBitmap pixelBuffer, float delta, object input)
 	{
 		this.UpdateWorker(delta, input);
-
 		this.UpdateActorPositions();
+		this.Clear(pixelBuffer);
+		foreach (var node in this.current_map_.Nodes)
+			this.RenderPlanes(pixel_buffer_, node);
 
-		this.Clear();
+		Vector2[] renderBounds = new Vector2[]
+		{
+			new Vector2(0, 0),
+			new Vector2(1, 0),
+			new Vector2(1, 1),
+			new Vector2(0, 1),
+		};
+
+		this.RenderMap(camera_.CurrentNode, camera_.CurrentNode, renderBounds, pixel_buffer_);
+		unsafe 
+		{
+			uint* pp = (uint*)pixelBuffer.GetPixels();
+			for (int x = 0; x < width_; x++) 
+			{
+				for (int y = 0; y < height_; y++) 
+				{
+					pp[x + y * width_] = pixel_buffer_[x + y * width_];
+				}
+			}
+		}
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
@@ -206,15 +316,15 @@ public abstract class PortalRenderingEngine : IDisposable
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
-	private void RasterizeVerticalSlice(SKBitmap pixels, SKBitmap texture, Point3D[] points, SKRectI portal_screen_space)
+	private void RasterizeVerticalSlice(uint[] pixels, SKBitmap texture, Point3D[] points, SKRectI portal_screen_space)
 	{
 		if (points[0].XYZ.Y == int.MinValue || points[1].XYZ.Y == int.MaxValue)
 			return;
 
 		int x = (int)points[0].XYZ.X;
 		var u = points[0].UVW.X;
-		int y1 = Math.Clamp(0, height_, (int)points[0].XYZ.Y);
-		int y2 = Math.Clamp(0, height_, (int)points[1].XYZ.Y);
+		int y1 = Math.Clamp((int)points[0].XYZ.Y, 0, height_);
+		int y2 = Math.Clamp((int)points[1].XYZ.Y, 0, height_);
 
 		var v_slope = new Slope(points[1].UVW.Y - points[0].UVW.Y, points[1].XYZ.Y - points[0].XYZ.Y);
 		var z_map = new Slope(points[1].OriginalPosition.Z - points[0].OriginalPosition.Z, points[1].XYZ.Y - points[0].XYZ.Y);
@@ -240,7 +350,7 @@ public abstract class PortalRenderingEngine : IDisposable
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
-	private void RenderPlanes(SKBitmap pixels, Node render_node/*, SKBitmap minimap*/)
+	private void RenderPlanes(uint[] pixels, Node render_node/*, SKBitmap minimap*/)
 	{
 		// render the floor/ceiling. this uses actual 3d projection!
 		// floor
@@ -344,7 +454,7 @@ public abstract class PortalRenderingEngine : IDisposable
 
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
-	private void RenderMap(Node render_node, Node last_node, Vector2[] normalized_bounds, SKBitmap pixels)
+	private void RenderMap(Node render_node, Node last_node, Vector2[] normalized_bounds, uint[] pixels)
 	{
 
 		// render walls and minimap
@@ -478,9 +588,9 @@ public abstract class PortalRenderingEngine : IDisposable
 
 
 			int x1 = Math.Max((int)(points[0].XYZ.X * width_), (int)(normalized_bounds[0].X * width_));
-			x1 = Math.Clamp(0, width_, x1);
+			x1 = Math.Clamp(x1, 0, width_);
 			int x2 = Math.Min((int)(points[1].XYZ.X * width_), (int)(normalized_bounds[1].X * width_));
-			x2 = Math.Clamp(0, width_, x2);
+			x2 = Math.Clamp(x2, 0, width_);
 
 			var z_start_inv = 1f / points[0].XYZ.Z;
 			var z_end_inv = 1f / points[1].XYZ.Z;
@@ -600,21 +710,22 @@ public abstract class PortalRenderingEngine : IDisposable
 
 	public void End()
 	{
+		is_running_ = false;
 	}
 
 	public void LoadMap(Map map)
 	{
+		this.current_map_ = map;
 	}
 
-
-	public Camera Camera { get; private set; }
+	public Camera Camera => this.camera_;
 
 	public void AddPlayer(IPlayer player)
 	{
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
-	private void RasterizePolygon(SKBitmap pixels, List<Point3D> vertices, int vertex_count, SKBitmap texture)
+	private void RasterizePolygon(uint[] pixels, List<Point3D> vertices, int vertex_count, SKBitmap texture)
 	{
 		for (int i = 0; i < vertex_count - 3 + 1; i++)
 		{
@@ -661,9 +772,9 @@ public abstract class PortalRenderingEngine : IDisposable
 			var bw = new Slope(points[2].UVW.Z - points[0].UVW.Z, (float)(Math.Abs(y3 - y1)));
 
 
-			if ((y2 - y1) != 0)
+			if ((y2 - y1) == 1)
 			{
-				for (int y = Math.Clamp(0, height_, y1); (y < y2) && (y < height_); y++)
+				for (int y = Math.Clamp(y1, 0, height_); (y < y2) && (y < height_); y++)
 				{
 					int x1 = (int)(ax.Interpolate(points[0].XYZ.X, y - y1) * width_);
 					int x2 = (int)(bx.Interpolate(points[0].XYZ.X, y - y1) * width_);
@@ -701,7 +812,7 @@ public abstract class PortalRenderingEngine : IDisposable
 					var tstep = 1.0f / ((float)(x2 - x1));
 					var t = 0.0f;
 
-					for (int x = Math.Clamp(0, width_, x1); (x < x2) && (x < width_); x++)
+					for (int x = Math.Clamp(x1, 0, width_); (x < x2) && (x < width_); x++)
 					{
 						tex_u = (1.0f - t) * u1 + t * u2;
 						tex_v = (1.0f - t) * v1 + t * v2;
@@ -723,7 +834,7 @@ public abstract class PortalRenderingEngine : IDisposable
 				}
 			}
 
-			if ((y3 - y2) != 0)
+			if ((y3 - y2) == 1)
 			{
 				ax = new Slope(points[2].XYZ.X - points[1].XYZ.X, (float)(Math.Abs(y3 - y2)));
 				ax_map = new Slope(points[2].OriginalPosition.X - points[1].OriginalPosition.X, (float)(Math.Abs(y3 - y2)));
@@ -733,7 +844,7 @@ public abstract class PortalRenderingEngine : IDisposable
 				aw = new Slope(points[2].UVW.Z - points[1].UVW.Z, (float)(Math.Abs(y3 - y2)));
 
 				bx = new Slope(points[2].XYZ.X - points[0].XYZ.X, (float)(Math.Abs(y3 - y1)));
-				for (int y = Math.Clamp(0, height_, y2); (y < y3) && (y < height_); y++)
+				for (int y = Math.Clamp(y2, 0, height_); (y < y3) && (y < height_); y++)
 				{
 					int x1 = (int)(ax.Interpolate(points[1].XYZ.X, y - y2) * width_);
 					int x2 = (int)(bx.Interpolate(points[0].XYZ.X, y - y1) * width_);
@@ -769,7 +880,7 @@ public abstract class PortalRenderingEngine : IDisposable
 					var tstep = 1f / (float)(x2 - x1);
 					var t = 0f;
 
-					for (int x = Math.Clamp(0, width_, x1); (x < x2) && (x < width_); x++)
+					for (int x = Math.Clamp(x1, 0, width_); (x < x2) && (x < width_); x++)
 					{
 						tex_u = (1.0f - t) * u1 + t * u2;
 						tex_v = (1.0f - t) * v1 + t * v2;

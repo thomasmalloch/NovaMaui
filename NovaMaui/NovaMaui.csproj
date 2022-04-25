@@ -25,6 +25,7 @@
 		<SupportedOSPlatformVersion Condition="'$(TargetFramework)' == 'net6.0-android'">21.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$(TargetFramework.Contains('-windows'))">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$(TargetFramework.Contains('-windows'))">10.0.17763.0</TargetPlatformMinVersion>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net6.0-windows10.0.19041|AnyCPU'">
@@ -84,8 +85,12 @@
 	<ItemGroup>
 	  <PackageReference Include="BepuPhysics" Version="2.4.0" />
 	  <PackageReference Include="BepuUtilities" Version="2.4.0" />
+	  <PackageReference Include="CommunityToolkit.Maui" Version="1.0.0-rc1" />
+	  <PackageReference Include="CommunityToolkit.Maui.Core" Version="1.0.0-rc1" />
+	  <PackageReference Include="CommunityToolkit.Maui.Markup" Version="1.0.0-rc1" />
 	  <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
 	  <PackageReference Include="MathNet.Spatial" Version="0.6.0" />
+	  <PackageReference Include="Refractored.MvvmHelpers" Version="1.6.2" />
 	  <PackageReference Include="SkiaSharp" Version="2.88.0-preview.254" />
 	  <PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="2.88.0-preview.254" />
 	  <PackageReference Include="SkiaSharp.Views.Maui.Core" Version="2.88.0-preview.254" />

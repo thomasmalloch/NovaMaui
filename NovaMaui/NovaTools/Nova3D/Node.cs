@@ -14,10 +14,10 @@ public class Node
 {
     public SKBitmap CeilingTexture { get; set; }
     public SKBitmap FloorTexture { get; set; }
-    public List<Wall> Walls { get; set; }
-    public List<IActor> Actors { get; set; }
-    public List<Vector2> PlaneXY { get; set; }
-    public List<Vector2> PlaneUV { get; set; }
+    public List<Wall> Walls { get; set; } = new();
+    public List<IActor> Actors { get; set; } = new();
+    public List<Vector2> PlaneXY { get; set; } = new();
+    public List<Vector2> PlaneUV { get; set; } = new();
     public float FloorHeight { get; set; }
     public float CeilingHeight { get; set; }
 }
